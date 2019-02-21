@@ -58,21 +58,10 @@ class GameLogEntry(object):
             self.log_keys.append(key)
         setattr(self, key, value + a)
 
-
 class GameLogger(Process):
     def __init__(self, timeout, print_interval, model_save_interval, log_file):
         super(GameLogger, self).__init__()
-        kwargs = dict(
-            format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
-            datefmt='%d-%m-%Y:%H:%M:%S',
-            level=logging.DEBUG)
-        if log_file != "":
-            kwargs["filename"] = log_file
-        else:
-            kwargs["stream"] = sys.stdout
-
-        logging.basicConfig(**kwargs)
-
+        self.log_file = log_file
         self.timeout = timeout
         self.print_interval = print_interval
         self.model_save_interval = model_save_interval
@@ -109,7 +98,22 @@ class GameLogger(Process):
                 self.__save_models(self.counter // self.print_interval //
                                    self.model_save_interval)
 
+    def __setup_logging(self):
+        kwargs = dict(
+            format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
+            datefmt='%d-%m-%Y:%H:%M:%S',
+            level=logging.INFO)
+        if self.log_file != "":
+            kwargs["filename"] = self.log_file
+        else:
+            kwargs["stream"] = sys.stdout
+        logging.basicConfig(**kwargs)
+
     def run(self):
+        # In some multiprocessing situation (e.g., with start method 'spawn'),
+        # we need to setup logging configuration in the subprocess, otherwise the logging
+        # is not properly configured.
+        self.__setup_logging()
         self.running.value = True
         while self.running.value:
             try:

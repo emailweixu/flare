@@ -1,10 +1,10 @@
 from abc import ABCMeta, abstractmethod
 from multiprocessing import Process, Value
 import numpy as np
+import time
 from flare.common.log import GameLogEntry
 from flare.common.communicator import AgentCommunicator
 from flare.common.replay_buffer import NoReplacementQueue, ReplayBuffer, Experience
-
 
 class AgentHelper(object):
     """
@@ -234,7 +234,7 @@ class Agent(Process):
         self.running = Value('i', 0)
         self.daemon = True  ## Process member
         self.alive = 1
-        self.env_f = None
+        self.env_class = None
         self.actrep = actrep
 
     def set_env(self, env_class, *args, **kwargs):
@@ -246,7 +246,18 @@ class Agent(Process):
         env_class:    The environment class to create
         args, kwargs: The arguments for creating the class
         """
-        self.env_f = lambda: env_class(*args, **kwargs)
+        self.env_class = env_class
+        self.env_args = args
+        self.env_kwargs = kwargs
+        # lambda function is not picklable. multiprocessing start method 'spawn'
+        # requires all the data which need to be communicated must be picklable
+        # self.env_f = lambda: env_class(*args, **kwargs)
+
+    @property
+    def env_f(self):
+        if self.env_class is None:
+            return None
+        return lambda: self.env_class(*self.env_args, **self.env_kwargs)
 
     def add_agent_helper(self, helper, input_keys, action_keys, state_keys,
                          reward_keys):
@@ -303,6 +314,7 @@ class Agent(Process):
             return self.helpers[alg_name]._store_data(self.alive, data)
 
     def _run_one_episode(self):
+        t0 = time.time()
         def __store_data(observations, actions, states, rewards):
             learning_ret = self._cts_store_data(observations, actions, states,
                                                 rewards)  ## written by user
@@ -341,6 +353,7 @@ class Agent(Process):
         ## 'success' (e.g., 'breakout' never ends), this quantity will
         ## always be zero
         self.log_entry.add_key("success", next_game_over > 0)
+        self.log_entry.add_key("time", time.time() - t0)
         return self._total_reward()
 
     def _reset_env(self):

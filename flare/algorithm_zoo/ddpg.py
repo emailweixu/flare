@@ -52,7 +52,7 @@ class ContinuousDeterministicModel(Model):
         return [("action", dict(shape=[self.action_dims]))]
 
     def policy(self, inputs, states):
-        out = self.policy_fc1(inputs.values()[0])
+        out = self.policy_fc1(list(inputs.values())[0])
         out = self.relu(out)
         out = self.policy_fc2(out)
         out = self.relu(out)
@@ -60,7 +60,7 @@ class ContinuousDeterministicModel(Model):
         return dict(action=action), states
 
     def value(self, inputs, states, actions=None):
-        out = self.critic_fc1(inputs.values()[0])
+        out = self.critic_fc1(list(inputs.values())[0])
         h = self.relu(out)
         if actions is None:
             actions, _ = self.policy(inputs, states)
